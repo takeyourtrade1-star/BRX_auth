@@ -19,9 +19,9 @@ settings = get_settings()
 
 # Conservative pool settings for AWS t3.micro (1GB RAM)
 # pool_size=10, max_overflow=5 = max 15 connections
+# Note: poolclass is not needed with async engine - SQLAlchemy handles it automatically
 engine = create_async_engine(
     settings.DATABASE_URL,
-    poolclass=QueuePool,
     pool_size=10,  # Conservative for t3.micro
     max_overflow=5,  # Conservative for t3.micro
     pool_pre_ping=True,  # Verify connections before using
