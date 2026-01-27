@@ -1,7 +1,3 @@
-"""
-Authentication Routes
-All authentication endpoints.
-"""
 from fastapi import APIRouter, BackgroundTasks, Depends, Request, status
 from fastapi.responses import JSONResponse
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -55,7 +51,6 @@ async def register(
     db: AsyncSession = Depends(get_db_session),
     http_request: Request = None,
 ) -> UserResponse:
-    """Register a new user."""
     ip_address = extract_client_ip(http_request)
     user_agent = http_request.headers.get("User-Agent")
 
@@ -69,7 +64,6 @@ async def register(
     except ValidationError as e:
         raise
     except AuthenticationError as e:
-        # Honeypot triggered - return generic error
         raise AuthenticationError("Invalid credentials")
 
 
@@ -80,7 +74,6 @@ async def login_endpoint(
     db: AsyncSession = Depends(get_db_session),
     http_request: Request = None,
 ) -> TokenResponse | PreAuthTokenResponse:
-    """Login user. Returns PRE_AUTH token if MFA enabled."""
     ip_address = extract_client_ip(http_request)
     user_agent = http_request.headers.get("User-Agent")
 
@@ -94,7 +87,6 @@ async def login_endpoint(
     except AccountLockedError:
         raise
     except AuthenticationError as e:
-        # Honeypot or invalid credentials - return generic error
         raise AuthenticationError("Invalid credentials")
 
 
@@ -105,7 +97,6 @@ async def verify_mfa_endpoint(
     db: AsyncSession = Depends(get_db_session),
     http_request: Request = None,
 ) -> TokenResponse:
-    """Verify MFA code and get access/refresh tokens."""
     ip_address = extract_client_ip(http_request)
     user_agent = http_request.headers.get("User-Agent")
 
@@ -129,7 +120,6 @@ async def refresh_endpoint(
     db: AsyncSession = Depends(get_db_session),
     http_request: Request = None,
 ) -> TokenResponse:
-    """Refresh access token using refresh token."""
     ip_address = extract_client_ip(http_request)
     user_agent = http_request.headers.get("User-Agent")
 
@@ -149,7 +139,6 @@ async def logout_endpoint(
     db: AsyncSession = Depends(get_db_session),
     http_request: Request = None,
 ) -> MessageResponse:
-    """Logout user and revoke refresh token."""
     ip_address = extract_client_ip(http_request)
     user_agent = http_request.headers.get("User-Agent")
 
@@ -172,7 +161,6 @@ async def change_password_endpoint(
     db: AsyncSession = Depends(get_db_session),
     http_request: Request = None,
 ) -> MessageResponse:
-    """Change user password."""
     ip_address = extract_client_ip(http_request)
     user_agent = http_request.headers.get("User-Agent")
 
@@ -193,7 +181,6 @@ async def enable_mfa_endpoint(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db_session),
 ) -> MFAQRCodeResponse:
-    """Enable MFA - generate QR code."""
     return await enable_mfa_uc.enable_mfa(
         session=db,
         user_id=current_user.id,
@@ -207,7 +194,6 @@ async def verify_mfa_setup_endpoint(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db_session),
 ) -> MessageResponse:
-    """Verify MFA code and enable MFA."""
     await enable_mfa_uc.verify_and_enable_mfa(
         session=db,
         user_id=current_user.id,
@@ -224,7 +210,6 @@ async def disable_mfa_endpoint(
     db: AsyncSession = Depends(get_db_session),
     http_request: Request = None,
 ) -> MessageResponse:
-    """Disable MFA."""
     ip_address = extract_client_ip(http_request)
     user_agent = http_request.headers.get("User-Agent")
 
@@ -243,7 +228,6 @@ async def disable_mfa_endpoint(
 async def get_current_user_info(
     current_user: User = Depends(get_current_user),
 ) -> UserResponse:
-    """Get current user information."""
     return UserResponse(
         id=current_user.id,
         email=current_user.email,

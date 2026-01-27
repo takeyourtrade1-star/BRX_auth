@@ -1,7 +1,3 @@
-"""
-Repository Layer - Data Access
-All database operations using async SQLAlchemy 2.0.
-"""
 from datetime import datetime, timedelta, timezone
 from typing import Optional
 from uuid import UUID
@@ -20,8 +16,6 @@ from app.infrastructure.database.models import (
 
 
 class UserRepository:
-    """Repository for user operations."""
-
     def __init__(self, session: AsyncSession):
         self.session = session
 
@@ -32,7 +26,6 @@ class UserRepository:
         security_stamp: UUID,
         account_status: AccountStatusEnum = AccountStatusEnum.PENDING_VERIFICATION,
     ) -> User:
-        """Create a new user with UUID v7."""
         user = User(
             id=uuid6.uuid7(),
             email=email,
@@ -47,21 +40,18 @@ class UserRepository:
         return user
 
     async def get_by_id(self, user_id: UUID) -> Optional[User]:
-        """Get user by ID."""
         result = await self.session.execute(
             select(User).where(User.id == user_id)
         )
         return result.scalar_one_or_none()
 
     async def get_by_email(self, email: str) -> Optional[User]:
-        """Get user by email."""
         result = await self.session.execute(
             select(User).where(User.email == email)
         )
         return result.scalar_one_or_none()
 
     async def update_security_stamp(self, user_id: UUID, new_stamp: UUID) -> None:
-        """Update user security stamp."""
         await self.session.execute(
             update(User)
             .where(User.id == user_id)
@@ -69,18 +59,14 @@ class UserRepository:
         )
 
     async def increment_failed_login_attempts(self, user_id: UUID) -> None:
-        """Increment failed login attempts."""
         user = await self.get_by_id(user_id)
         if user:
             new_attempts = user.failed_login_attempts + 1
             lock_until = None
             new_status = user.account_status
 
-            # Lock account if max attempts reached
-            if new_attempts >= 5:  # From settings, but hardcoded for now
-                lock_until = datetime.now(timezone.utc) + timedelta(
-                    minutes=30  # From settings
-                )
+            if new_attempts >= 5:
+                lock_until = datetime.now(timezone.utc) + timedelta(minutes=30)
                 new_status = AccountStatusEnum.LOCKED
 
             await self.session.execute(
@@ -95,7 +81,6 @@ class UserRepository:
             )
 
     async def reset_failed_login_attempts(self, user_id: UUID) -> None:
-        """Reset failed login attempts on successful login."""
         await self.session.execute(
             update(User)
             .where(User.id == user_id)
@@ -110,7 +95,6 @@ class UserRepository:
     async def update_password(
         self, user_id: UUID, password_hash: str, new_security_stamp: UUID
     ) -> None:
-        """Update user password and security stamp."""
         await self.session.execute(
             update(User)
             .where(User.id == user_id)
@@ -127,7 +111,6 @@ class UserRepository:
         mfa_enabled: bool,
         mfa_secret_enc: Optional[str] = None,
     ) -> None:
-        """Update MFA settings."""
         values = {
             "mfa_enabled": mfa_enabled,
             "updated_at": datetime.now(timezone.utc),
@@ -138,8 +121,6 @@ class UserRepository:
 
 
 class SessionRepository:
-    """Repository for session operations."""
-
     def __init__(self, session: AsyncSession):
         self.session = session
 
@@ -152,7 +133,6 @@ class SessionRepository:
         ip_address: Optional[str] = None,
         user_agent: Optional[str] = None,
     ) -> Session:
-        """Create a new session with UUID v7."""
         session = Session(
             id=uuid6.uuid7(),
             user_id=user_id,
@@ -170,7 +150,6 @@ class SessionRepository:
     async def get_by_token_hash(
         self, refresh_token_hash: str
     ) -> Optional[Session]:
-        """Get session by refresh token hash."""
         result = await self.session.execute(
             select(Session).where(
                 Session.refresh_token_hash == refresh_token_hash,
@@ -182,7 +161,6 @@ class SessionRepository:
     async def revoke_session(
         self, session_id: UUID, reason: Optional[str] = None
     ) -> None:
-        """Revoke a session."""
         await self.session.execute(
             update(Session)
             .where(Session.id == session_id)
@@ -196,7 +174,6 @@ class SessionRepository:
     async def revoke_all_user_sessions(
         self, user_id: UUID, reason: Optional[str] = None
     ) -> None:
-        """Revoke all sessions for a user."""
         await self.session.execute(
             update(Session)
             .where(Session.user_id == user_id, Session.is_revoked == False)
@@ -208,7 +185,6 @@ class SessionRepository:
         )
 
     async def delete_expired_sessions(self) -> int:
-        """Delete expired sessions (cleanup job)."""
         result = await self.session.execute(
             select(Session).where(
                 Session.expires_at < datetime.now(timezone.utc)
@@ -222,8 +198,6 @@ class SessionRepository:
 
 
 class AuditLogRepository:
-    """Repository for audit log operations (append-only)."""
-
     def __init__(self, session: AsyncSession):
         self.session = session
 
@@ -236,10 +210,8 @@ class AuditLogRepository:
         user_agent: Optional[str] = None,
         geo_location: Optional[dict] = None,
         event_metadata: Optional[dict] = None,
-        metadata: Optional[dict] = None,  # Compatibilità per retrocompatibilità
+        metadata: Optional[dict] = None,
     ) -> SecurityAuditLog:
-        """Create a new audit log entry with UUID v7."""
-        # Gestisce entrambi i casi per sicurezza (event_metadata ha priorità)
         final_metadata = event_metadata if event_metadata is not None else metadata
         
         audit_log = SecurityAuditLog(
@@ -250,7 +222,7 @@ class AuditLogRepository:
             ip_address=ip_address,
             user_agent=user_agent,
             geo_location=geo_location,
-            event_metadata=final_metadata,  # Usa il nuovo attributo del modello
+            event_metadata=final_metadata,
         )
         self.session.add(audit_log)
         await self.session.flush()

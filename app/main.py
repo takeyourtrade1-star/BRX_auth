@@ -1,11 +1,8 @@
-"""
-Main FastAPI Application
-Application entry point with all routes, middleware, and lifecycle management.
-"""
 import logging
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
+from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.exceptions import (
@@ -42,8 +39,6 @@ logger = logging.getLogger(__name__)
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """Application lifespan manager (startup/shutdown)."""
-    # Startup
     logger.info("Starting auth service...")
     try:
         await init_db()
@@ -53,14 +48,12 @@ async def lifespan(app: FastAPI):
 
     yield
 
-    # Shutdown
     logger.info("Shutting down auth service...")
     await close_db()
     await close_redis()
     logger.info("Shutdown complete")
 
 
-# Create FastAPI app
 app = FastAPI(
     title=settings.APP_NAME,
     version=settings.APP_VERSION,
@@ -70,28 +63,23 @@ app = FastAPI(
     redoc_url="/redoc" if settings.DEBUG else None,
 )
 
-# CORS configuration
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"] if settings.DEBUG else [],  # Configure in production
+    allow_origins=["*"] if settings.DEBUG else [],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-# Security middleware (must be first)
 app.add_middleware(SecurityHeadersMiddleware)
 app.add_middleware(RequestContextMiddleware)
 
-# Rate limiting middleware
 if settings.RATE_LIMIT_ENABLED:
     app.add_middleware(RateLimitMiddleware)
 
-# Include routers
 app.include_router(health.router)
 app.include_router(auth.router)
 
-# Exception handlers
 app.add_exception_handler(AuthenticationError, authentication_error_handler)
 app.add_exception_handler(AuthorizationError, authorization_error_handler)
 app.add_exception_handler(ValidationError, validation_error_handler)
@@ -100,8 +88,6 @@ app.add_exception_handler(AccountLockedError, account_locked_error_handler)
 app.add_exception_handler(
     MFAVerificationError, mfa_verification_error_handler
 )
-from fastapi.exceptions import RequestValidationError
-
 app.add_exception_handler(
     RequestValidationError, request_validation_error_handler
 )
@@ -110,7 +96,6 @@ app.add_exception_handler(Exception, generic_exception_handler)
 
 @app.get("/")
 async def root():
-    """Root endpoint."""
     return {
         "service": settings.APP_NAME,
         "version": settings.APP_VERSION,

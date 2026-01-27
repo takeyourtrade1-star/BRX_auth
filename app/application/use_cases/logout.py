@@ -1,17 +1,12 @@
-"""
-Logout Use Case
-Revoke refresh token and invalidate session.
-"""
 import uuid6
-from typing import Optional
 from uuid import UUID
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.exceptions import AuthenticationError
+from app.core.security import jwt_manager
 from app.infrastructure.database.models import EventTypeEnum
 from app.infrastructure.database.repositories import (
-    AuditLogRepository,
     SessionRepository,
     UserRepository,
 )
@@ -23,24 +18,8 @@ async def logout_user(
     user_id: UUID,
     refresh_token: str,
     ip_address: str,
-    user_agent: Optional[str] = None,
+    user_agent: str | None = None,
 ) -> None:
-    """
-    Logout user by revoking refresh token.
-
-    Args:
-        session: Database session
-        user_id: User ID
-        refresh_token: Refresh token to revoke
-        ip_address: Client IP address
-        user_agent: User agent string
-
-    Raises:
-        AuthenticationError: If session not found
-    """
-    from app.core.security import jwt_manager
-
-    # Find session by refresh token hash
     refresh_token_hash = jwt_manager.hash_refresh_token(refresh_token)
     session_repo = SessionRepository(session)
     db_session = await session_repo.get_by_token_hash(refresh_token_hash)
@@ -48,17 +27,14 @@ async def logout_user(
     if not db_session or db_session.user_id != user_id:
         raise AuthenticationError("Invalid session")
 
-    # Revoke session
     await session_repo.revoke_session(
         db_session.id, reason="user_logout"
     )
 
-    # Update security stamp (invalidates all tokens)
     new_security_stamp = uuid6.uuid7()
     user_repo = UserRepository(session)
     await user_repo.update_security_stamp(user_id, new_security_stamp)
 
-    # Log audit event
     await audit_service.log_event(
         session=session,
         event_type=EventTypeEnum.LOGOUT,
