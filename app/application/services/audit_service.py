@@ -89,7 +89,7 @@ class AuditService:
                 risk_score=risk_score,
                 user_agent=user_agent,
                 geo_location=geo_location,
-                metadata=metadata,
+                event_metadata=metadata,  # Passiamo 'metadata' al parametro 'event_metadata'
             )
 
             logger.info(

@@ -235,9 +235,13 @@ class AuditLogRepository:
         risk_score: int = 0,
         user_agent: Optional[str] = None,
         geo_location: Optional[dict] = None,
-        metadata: Optional[dict] = None,
+        event_metadata: Optional[dict] = None,
+        metadata: Optional[dict] = None,  # Compatibilità per retrocompatibilità
     ) -> SecurityAuditLog:
         """Create a new audit log entry with UUID v7."""
+        # Gestisce entrambi i casi per sicurezza (event_metadata ha priorità)
+        final_metadata = event_metadata if event_metadata is not None else metadata
+        
         audit_log = SecurityAuditLog(
             id=uuid6.uuid7(),
             user_id=user_id,
@@ -246,7 +250,7 @@ class AuditLogRepository:
             ip_address=ip_address,
             user_agent=user_agent,
             geo_location=geo_location,
-            metadata=metadata,
+            event_metadata=final_metadata,  # Usa il nuovo attributo del modello
         )
         self.session.add(audit_log)
         await self.session.flush()

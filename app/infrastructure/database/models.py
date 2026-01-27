@@ -234,8 +234,10 @@ class SecurityAuditLog(Base):
     geo_location: Mapped[Optional[dict]] = mapped_column(
         JSONB, nullable=True
     )  # { "country": "IT", "city": "Milan" }
-    metadata: Mapped[Optional[dict]] = mapped_column(
-        JSONB, nullable=True
+    # Rinominiamo l'attributo Python in 'event_metadata' per evitare conflitti con SQLAlchemy.metadata,
+    # ma mappiamo la colonna SQL su "metadata" per rispettare lo schema.sql
+    event_metadata: Mapped[Optional[dict]] = mapped_column(
+        "metadata", JSONB, nullable=True
     )  # { "reason": "wrong_password", "attempt": 3 }
 
     # Timestamp

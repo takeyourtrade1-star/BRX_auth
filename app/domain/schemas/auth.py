@@ -264,9 +264,14 @@ class AuditLogCreate(BaseModel):
     ip_address: str = Field(..., description="IP address")
     user_agent: Optional[str] = Field(None, description="User agent string")
     geo_location: Optional[dict] = Field(None, description="Geo location JSON")
-    metadata: Optional[dict] = Field(None, description="Additional metadata JSON")
+    event_metadata: Optional[dict] = Field(
+        None, 
+        description="Additional metadata JSON",
+        alias="metadata"  # Accetta anche 'metadata' dall'esterno per retrocompatibilità
+    )
 
     class Config:
+        populate_by_name = True  # Permette di usare sia 'event_metadata' che 'metadata'
         json_schema_extra = {
             "example": {
                 "user_id": "01234567-89ab-cdef-0123-456789abcdef",
@@ -275,6 +280,6 @@ class AuditLogCreate(BaseModel):
                 "ip_address": "192.168.1.1",
                 "user_agent": "Mozilla/5.0...",
                 "geo_location": {"country": "IT", "city": "Milan"},
-                "metadata": {"device": "mobile"},
+                "event_metadata": {"device": "mobile"},
             }
         }
