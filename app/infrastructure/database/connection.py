@@ -10,7 +10,6 @@ from sqlalchemy.ext.asyncio import (
     async_sessionmaker,
     create_async_engine,
 )
-from sqlalchemy.pool import QueuePool
 
 from app.core.config import get_settings
 from app.infrastructure.database.models import Base
