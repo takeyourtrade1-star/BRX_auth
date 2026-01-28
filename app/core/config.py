@@ -142,17 +142,64 @@ class Settings(BaseSettings):
             if self.DEBUG:
                 print(f"Warning: Could not load from SSM: {e}. Using environment variables.")
 
+    def _format_pem_key(self, key_str: Optional[str], is_private: bool) -> bytes:
+        if key_str is None:
+            raise ValueError("PEM key string is None")
+        key_str = key_str.strip()
+        if not key_str:
+            raise ValueError("PEM key string is empty")
+
+        key_str = key_str.replace("\r\n", "\n").replace("\r", "\n")
+
+        if key_str.startswith("-----BEGIN"):
+            lines = key_str.split("\n")
+            result_lines = []
+            body_chars = []
+            footer = None
+            for line in lines:
+                line_stripped = line.strip()
+                if line_stripped.startswith("-----BEGIN"):
+                    result_lines.append(line_stripped)
+                    continue
+                if line_stripped.startswith("-----END"):
+                    footer = line_stripped
+                    break
+                if line_stripped:
+                    body_chars.append(line_stripped.replace(" ", ""))
+            body_joined = "".join(body_chars)
+            for i in range(0, len(body_joined), 64):
+                result_lines.append(body_joined[i : i + 64])
+            if footer:
+                result_lines.append(footer)
+            return "\n".join(result_lines).encode("utf-8")
+
+        body = (
+            key_str.replace(" ", "")
+            .replace("\n", "")
+            .replace("\r", "")
+            .replace("\t", "")
+        )
+        if is_private:
+            header = "-----BEGIN RSA PRIVATE KEY-----"
+            footer = "-----END RSA PRIVATE KEY-----"
+        else:
+            header = "-----BEGIN PUBLIC KEY-----"
+            footer = "-----END PUBLIC KEY-----"
+        chunks = [body[i : i + 64] for i in range(0, len(body), 64)]
+        pem = "\n".join([header] + chunks + [footer])
+        return pem.encode("utf-8")
+
     @property
     def jwt_private_key_bytes(self) -> bytes:
         if not self.JWT_PRIVATE_KEY:
             raise ValueError("JWT_PRIVATE_KEY not configured")
-        return self.JWT_PRIVATE_KEY.encode("utf-8")
+        return self._format_pem_key(self.JWT_PRIVATE_KEY, is_private=True)
 
     @property
     def jwt_public_key_bytes(self) -> bytes:
         if not self.JWT_PUBLIC_KEY:
             raise ValueError("JWT_PUBLIC_KEY not configured")
-        return self.JWT_PUBLIC_KEY.encode("utf-8")
+        return self._format_pem_key(self.JWT_PUBLIC_KEY, is_private=False)
 
     @property
     def fernet_key_bytes(self) -> bytes:
