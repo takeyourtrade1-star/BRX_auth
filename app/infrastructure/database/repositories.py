@@ -8,10 +8,13 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.infrastructure.database.models import (
     AccountStatusEnum,
+    AccountTypeEnum,
     EventTypeEnum,
     SecurityAuditLog,
     Session,
     User,
+    UserConsent,
+    UserPreference,
 )
 
 
@@ -21,16 +24,41 @@ class UserRepository:
 
     async def create(
         self,
+        username: str,
         email: str,
         password_hash: str,
         security_stamp: UUID,
+        account_type: AccountTypeEnum,
+        country: str,
+        phone_prefix: str,
+        phone: str,
+        vat_prefix: Optional[str] = None,
+        first_name: Optional[str] = None,
+        last_name: Optional[str] = None,
+        ragione_sociale: Optional[str] = None,
+        piva: Optional[str] = None,
+        email_verification_code: Optional[str] = None,
+        email_verification_expires_at: Optional[datetime] = None,
         account_status: AccountStatusEnum = AccountStatusEnum.PENDING_VERIFICATION,
     ) -> User:
         user = User(
             id=uuid6.uuid7(),
+            username=username,
             email=email,
             password_hash=password_hash,
             security_stamp=security_stamp,
+            account_type=account_type,
+            country=country,
+            phone_prefix=phone_prefix,
+            phone=phone,
+            vat_prefix=vat_prefix,
+            first_name=first_name,
+            last_name=last_name,
+            ragione_sociale=ragione_sociale,
+            piva=piva,
+            email_verification_code=email_verification_code,
+            email_verification_expires_at=email_verification_expires_at,
+            is_active=True,
             account_status=account_status,
             failed_login_attempts=0,
             mfa_enabled=False,
@@ -48,6 +76,12 @@ class UserRepository:
     async def get_by_email(self, email: str) -> Optional[User]:
         result = await self.session.execute(
             select(User).where(User.email == email)
+        )
+        return result.scalar_one_or_none()
+
+    async def get_by_username(self, username: str) -> Optional[User]:
+        result = await self.session.execute(
+            select(User).where(User.username == username)
         )
         return result.scalar_one_or_none()
 
@@ -118,6 +152,85 @@ class UserRepository:
         if mfa_secret_enc is not None:
             values["mfa_secret_enc"] = mfa_secret_enc
         await self.session.execute(update(User).where(User.id == user_id).values(**values))
+
+
+class UserConsentRepository:
+    def __init__(self, session: AsyncSession):
+        self.session = session
+
+    async def create(
+        self,
+        user_id: UUID,
+        terms_accepted_at: Optional[datetime] = None,
+        privacy_accepted_at: Optional[datetime] = None,
+        cancellation_accepted_at: Optional[datetime] = None,
+        adult_confirmed_at: Optional[datetime] = None,
+        ip_address: Optional[str] = None,
+        user_agent: Optional[str] = None,
+    ) -> UserConsent:
+        consent = UserConsent(
+            user_id=user_id,
+            terms_accepted_at=terms_accepted_at,
+            privacy_accepted_at=privacy_accepted_at,
+            cancellation_accepted_at=cancellation_accepted_at,
+            adult_confirmed_at=adult_confirmed_at,
+            ip_address=ip_address,
+            user_agent=user_agent,
+        )
+        self.session.add(consent)
+        await self.session.flush()
+        return consent
+
+    async def get_by_user_id(self, user_id: UUID) -> Optional[UserConsent]:
+        result = await self.session.execute(
+            select(UserConsent).where(UserConsent.user_id == user_id)
+        )
+        return result.scalar_one_or_none()
+
+
+class UserPreferenceRepository:
+    def __init__(self, session: AsyncSession):
+        self.session = session
+
+    async def create(
+        self,
+        user_id: UUID,
+        theme: str = "system",
+        language: str = "it",
+        is_onboarding_completed: bool = False,
+    ) -> UserPreference:
+        pref = UserPreference(
+            user_id=user_id,
+            theme=theme,
+            language=language,
+            is_onboarding_completed=is_onboarding_completed,
+        )
+        self.session.add(pref)
+        await self.session.flush()
+        return pref
+
+    async def get_by_user_id(self, user_id: UUID) -> Optional[UserPreference]:
+        result = await self.session.execute(
+            select(UserPreference).where(UserPreference.user_id == user_id)
+        )
+        return result.scalar_one_or_none()
+
+    async def update_onboarding(
+        self,
+        user_id: UUID,
+        theme: str,
+        language: str,
+        is_onboarding_completed: bool = True,
+    ) -> Optional[UserPreference]:
+        pref = await self.get_by_user_id(user_id)
+        if not pref:
+            return None
+        pref.theme = theme
+        pref.language = language
+        pref.is_onboarding_completed = is_onboarding_completed
+        pref.updated_at = datetime.now(timezone.utc)
+        await self.session.flush()
+        return pref
 
 
 class SessionRepository:

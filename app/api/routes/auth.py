@@ -21,6 +21,7 @@ from app.domain.schemas.auth import (
     RefreshTokenRequest,
     RegisterRequest,
     TokenResponse,
+    UserPreferenceResponse,
     UserResponse,
     VerifyMFARequest,
 )
@@ -228,10 +229,20 @@ async def disable_mfa_endpoint(
 async def get_current_user_info(
     current_user: User = Depends(get_current_user),
 ) -> UserResponse:
+    preferences = None
+    if current_user.preferences:
+        preferences = UserPreferenceResponse(
+            theme=current_user.preferences.theme,
+            language=current_user.preferences.language,
+            is_onboarding_completed=current_user.preferences.is_onboarding_completed,
+            created_at=current_user.preferences.created_at,
+            updated_at=current_user.preferences.updated_at,
+        )
     return UserResponse(
         id=current_user.id,
         email=current_user.email,
         account_status=current_user.account_status.value,
         mfa_enabled=current_user.mfa_enabled,
         created_at=current_user.created_at,
+        preferences=preferences,
     )

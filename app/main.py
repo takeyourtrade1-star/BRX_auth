@@ -20,7 +20,7 @@ from app.api.middleware.security import (
     RequestContextMiddleware,
     SecurityHeadersMiddleware,
 )
-from app.api.routes import auth, health
+from app.api.routes import auth, health, users
 from app.core.config import get_settings
 from app.core.exceptions import (
     AccountLockedError,
@@ -79,6 +79,7 @@ if settings.RATE_LIMIT_ENABLED:
 
 app.include_router(health.router)
 app.include_router(auth.router)
+app.include_router(users.router)
 
 app.add_exception_handler(AuthenticationError, authentication_error_handler)
 app.add_exception_handler(AuthorizationError, authorization_error_handler)

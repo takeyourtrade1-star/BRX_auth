@@ -73,13 +73,10 @@ async def login_user(
         )
         raise AuthenticationError("Invalid credentials")
 
-    if user.account_status != AccountStatusEnum.ACTIVE:
-        if user.account_status == AccountStatusEnum.LOCKED:
-            raise AccountLockedError("Account is locked")
-        elif user.account_status == AccountStatusEnum.BANNED:
-            raise AuthenticationError("Account is banned")
-        elif user.account_status == AccountStatusEnum.PENDING_VERIFICATION:
-            raise AuthenticationError("Account pending verification")
+    if user.account_status == AccountStatusEnum.LOCKED:
+        raise AccountLockedError("Account is locked")
+    elif user.account_status == AccountStatusEnum.BANNED:
+        raise AuthenticationError("Account is banned")
 
     await user_repo.reset_failed_login_attempts(user.id)
 

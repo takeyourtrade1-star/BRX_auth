@@ -1,53 +1,110 @@
-"""
-Pydantic Schemas for Authentication Domain
-Includes anti-bot honeypot fields in RegisterRequest and LoginRequest.
-"""
 from datetime import datetime
 from typing import Optional
 from uuid import UUID
+import re
 
-from pydantic import BaseModel, EmailStr, Field, field_validator
-
-
-# ==========================================
-# REQUEST SCHEMAS (with Honeypot)
-# ==========================================
+from pydantic import BaseModel, EmailStr, Field, field_validator, model_validator
 
 
 class RegisterRequest(BaseModel):
-    """
-    User registration request.
-    Contains hidden honeypot field 'website_url' to detect bots.
-    If this field is filled, the request should be silently rejected.
-    """
+    website_url: str = Field(
+        default="",
+        description="Honeypot field - MUST be empty string. If filled, request is rejected.",
+    )
 
+    username: str = Field(..., min_length=3, max_length=20, description="Username")
     email: EmailStr = Field(..., description="User email address")
     password: str = Field(
         ...,
-        min_length=12,
+        min_length=8,
         max_length=128,
-        description="Password (min 12 characters)",
+        description="Password (min 8 characters, 1 upper, 1 lower, 1 number)",
     )
-    # HONEYPOT FIELD - Hidden from UI, bots will fill it
-    website_url: Optional[str] = Field(
-        default=None,
-        description="Honeypot field - should always be empty. If filled, request is rejected.",
-    )
+    account_type: str = Field(..., description="Account type: 'personal' or 'business'")
+
+    country: str = Field(..., min_length=2, max_length=2, description="ISO country code (2 chars)")
+    phone_prefix: str = Field(..., max_length=5, description="Phone prefix")
+    phone: str = Field(..., max_length=20, description="Phone number")
+    vat_prefix: Optional[str] = Field(None, max_length=2, description="VAT prefix (for business)")
+
+    first_name: Optional[str] = Field(None, max_length=100, description="First name (required for personal)")
+    last_name: Optional[str] = Field(None, max_length=100, description="Last name (required for personal)")
+    ragione_sociale: Optional[str] = Field(None, max_length=255, description="Company name (required for business)")
+    piva: Optional[str] = Field(None, max_length=20, description="VAT ID (required for business)")
+
+    termsAccepted: bool = Field(..., description="Terms and conditions acceptance")
+    privacyAccepted: bool = Field(..., description="Privacy policy acceptance")
+    cancellationAccepted: bool = Field(..., description="Cancellation policy acceptance")
+    adultConfirmed: bool = Field(..., description="Adult confirmation")
+
+    @field_validator("website_url")
+    @classmethod
+    def validate_honeypot(cls, v: str) -> str:
+        if v and v.strip():
+            raise ValueError("Invalid request")
+        return ""
+
+    @field_validator("username")
+    @classmethod
+    def validate_username(cls, v: str) -> str:
+        if not re.match(r"^[a-zA-Z0-9_]{3,20}$", v):
+            raise ValueError("Username must be 3-20 characters, alphanumeric and underscore only")
+        return v
 
     @field_validator("password")
     @classmethod
     def validate_password_strength(cls, v: str) -> str:
-        """Validate password meets security requirements."""
-        if len(v) < 12:
-            raise ValueError("Password must be at least 12 characters long")
-        # Add more validation as needed (uppercase, lowercase, numbers, special chars)
+        if len(v) < 8:
+            raise ValueError("Password must be at least 8 characters long")
+        if not re.search(r"[A-Z]", v):
+            raise ValueError("Password must contain at least one uppercase letter")
+        if not re.search(r"[a-z]", v):
+            raise ValueError("Password must contain at least one lowercase letter")
+        if not re.search(r"\d", v):
+            raise ValueError("Password must contain at least one number")
         return v
+
+    @field_validator("account_type")
+    @classmethod
+    def validate_account_type(cls, v: str) -> str:
+        if v not in ["personal", "business"]:
+            raise ValueError("account_type must be 'personal' or 'business'")
+        return v
+
+    @model_validator(mode="after")
+    def validate_conditional_fields(self):
+        account_type = self.account_type
+
+        if account_type == "personal":
+            if not self.first_name:
+                raise ValueError("first_name is required for personal accounts")
+            if not self.last_name:
+                raise ValueError("last_name is required for personal accounts")
+        elif account_type == "business":
+            if not self.ragione_sociale:
+                raise ValueError("ragione_sociale is required for business accounts")
+            if not self.piva:
+                raise ValueError("piva is required for business accounts")
+
+        return self
 
     class Config:
         json_schema_extra = {
             "example": {
+                "website_url": "",
+                "username": "johndoe",
                 "email": "user@example.com",
-                "password": "SecurePassword123!",
+                "password": "SecurePass123",
+                "account_type": "personal",
+                "country": "IT",
+                "phone_prefix": "+39",
+                "phone": "1234567890",
+                "first_name": "John",
+                "last_name": "Doe",
+                "termsAccepted": True,
+                "privacyAccepted": True,
+                "cancellationAccepted": True,
+                "adultConfirmed": True,
             }
         }
 
@@ -200,14 +257,45 @@ class PreAuthTokenResponse(BaseModel):
         }
 
 
-class UserResponse(BaseModel):
-    """User information response."""
+class UserPreferenceResponse(BaseModel):
+    theme: str = Field(..., description="UI theme: light, dark, system")
+    language: str = Field(..., description="ISO 2-char language code")
+    is_onboarding_completed: bool = Field(
+        ..., description="Whether onboarding wizard was completed"
+    )
+    created_at: datetime = Field(..., description="Preferences creation timestamp")
+    updated_at: datetime = Field(..., description="Last update timestamp")
 
+    class Config:
+        from_attributes = True
+
+
+class OnboardingRequest(BaseModel):
+    theme: str = Field(..., description="UI theme: light, dark, system")
+    language: str = Field(..., min_length=2, max_length=2, description="ISO 2-char language code")
+
+    @field_validator("theme")
+    @classmethod
+    def validate_theme(cls, v: str) -> str:
+        if v not in ("light", "dark", "system"):
+            raise ValueError("theme must be one of: light, dark, system")
+        return v
+
+    class Config:
+        json_schema_extra = {
+            "example": {"theme": "system", "language": "it"},
+        }
+
+
+class UserResponse(BaseModel):
     id: UUID = Field(..., description="User UUID")
     email: str = Field(..., description="User email")
     account_status: str = Field(..., description="Account status")
     mfa_enabled: bool = Field(..., description="MFA enabled status")
     created_at: datetime = Field(..., description="Account creation timestamp")
+    preferences: Optional[UserPreferenceResponse] = Field(
+        None, description="User UI preferences and onboarding status"
+    )
 
     class Config:
         from_attributes = True
@@ -218,6 +306,7 @@ class UserResponse(BaseModel):
                 "account_status": "active",
                 "mfa_enabled": True,
                 "created_at": "2026-01-27T12:00:00Z",
+                "preferences": None,
             }
         }
 
