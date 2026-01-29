@@ -290,16 +290,14 @@ class OnboardingRequest(BaseModel):
 class UserPreferenceUpdate(BaseModel):
     """Partial update for user preferences (theme, language, onboarding status)."""
 
-    language: Optional[str] = Field(None, min_length=2, max_length=2, description="ISO 2-char language code")
     theme: Optional[str] = Field(None, description="UI theme: light, dark, system")
-    is_onboarding_completed: Optional[bool] = Field(
-        None, description="Set to true when user completes the onboarding wizard"
-    )
+    language: Optional[str] = Field(None, min_length=2, max_length=2, description="ISO 2-char language code")
+    is_onboarding_completed: Optional[bool] = Field(None, description="Mark onboarding as completed")
 
     @field_validator("theme")
     @classmethod
     def validate_theme(cls, v: Optional[str]) -> Optional[str]:
-        if v is not None and v not in ("light", "dark", "system"):
+        if v and v not in ("light", "dark", "system"):
             raise ValueError("theme must be one of: light, dark, system")
         return v
 

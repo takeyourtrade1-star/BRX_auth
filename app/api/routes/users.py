@@ -29,7 +29,7 @@ async def update_preferences(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db_session),
 ) -> UserResponse:
-    return await onboarding_uc.update_preferences(
+    return await onboarding_uc.update_user_preferences(
         session=db,
         user_id=current_user.id,
         request=request,

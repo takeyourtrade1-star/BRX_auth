@@ -235,15 +235,17 @@ class UserPreferenceRepository:
     async def update_preferences(
         self,
         user_id: UUID,
-        *,
         theme: Optional[str] = None,
         language: Optional[str] = None,
         is_onboarding_completed: Optional[bool] = None,
     ) -> Optional[UserPreference]:
-        """Partial update of user preferences; only provided fields are updated."""
-        pref = await self.get_by_user_id(user_id)
+        """Aggiornamento parziale preferenze; salva anche is_onboarding_completed se inviato."""
+        result = await self.session.execute(
+            select(UserPreference).where(UserPreference.user_id == user_id)
+        )
+        pref = result.scalar_one_or_none()
+
         if not pref:
-            # Se non esistono preferenze, le creiamo al volo
             pref = UserPreference(
                 user_id=user_id,
                 theme=theme or "system",
@@ -252,16 +254,14 @@ class UserPreferenceRepository:
             )
             self.session.add(pref)
         else:
-            # Aggiornamento parziale
             if theme is not None:
                 pref.theme = theme
             if language is not None:
                 pref.language = language
-            # --- Assicurati che is_onboarding_completed venga salvato nell'UPDATE ---
             if is_onboarding_completed is not None:
                 pref.is_onboarding_completed = is_onboarding_completed
-            # -----------------------------------------------------------------------
             pref.updated_at = datetime.now(timezone.utc)
+
         await self.session.flush()
         return pref
 
